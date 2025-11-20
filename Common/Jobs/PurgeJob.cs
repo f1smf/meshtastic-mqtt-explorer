@@ -12,7 +12,7 @@ public class PurgeJob(
     IServiceProvider serviceProvider)
     : AJob(logger, contextFactory, serviceProvider)
 {
-    public async Task RunPurge()
+    public async Task RunPurgeAsync()
     {
         Logger.LogTrace("Purge des données");
         await PurgeOldData();

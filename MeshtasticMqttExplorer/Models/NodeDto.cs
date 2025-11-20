@@ -1,3 +1,4 @@
+using Common.Models;
 using Meshtastic.Protobufs;
 
 namespace MeshtasticMqttExplorer.Models;
@@ -16,4 +17,6 @@ public class NodeDto
     public required Config.Types.DeviceConfig.Types.Role? Role { get; set; }
     
     public required string Link { get; set; }
+
+    public required List<PacketNodeType> Stats { get; set; } = [];
 }

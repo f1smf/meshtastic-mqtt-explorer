@@ -34,8 +34,14 @@ try {
     var app = builder.Build();
 
     await app.Configure();
+
+    var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
     
-    app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<PurgeJob>("purgeJob", (a) => a.RunPurge(), Cron.Hourly);
+    jobManager.AddOrUpdate<PurgeJob>("purgeJob", a => a.RunPurgeAsync(), Cron.Hourly);
+    jobManager.AddOrUpdate<NotificationStatsServerJob>("notificationStatsServerJob", a => a.ExecuteAsync(), "59 11,23 * * *", new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris")
+    });
 
     Console.WriteLine("Started");
 
