@@ -224,7 +224,18 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         Logger.LogInformation("Add new packet #{id}|{idPacket} of type {type} from {from} to {to} by {gateway}. Encrypted : {encrypted}", packet.Id, meshPacket.Id, packet.PortNum, nodeFrom, nodeTo, nodeGateway, packet.Encrypted);
         Logger.LogDebug("New packet #{id} of type {type} {payload}", meshPacket.Id, meshPacket.Decoded?.Portnum, meshPacket.GetPayload());
 
-        return await DoReceive(packet, meshPacket);
+        var receive = await DoReceive(packet, meshPacket);
+
+        if (receive?.packet.RelayNodeNode == null)
+        {
+            return receive;
+        }
+
+        var nodeRelay = receive.Value.packet.RelayNodeNode;
+        nodeRelay.LastSeen = DateTime.UtcNow;
+        Context.Update(nodeRelay);
+        
+        return receive;
     }
 
     public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(Packet packet, MeshPacket? meshPacket = null)
@@ -328,10 +339,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .Select(a => a.NodeHeard)
             .ToListAsync();
 
-        // if (nodesCandidate.Count == 1)
-        // {
-        //     return nodesCandidate.First();
-        // }
+        if (nodesCandidate.Count == 1)
+        {
+            return nodesCandidate.First();
+        }
 
         // var fromPosition = from.Positions.FirstOrDefault();
 
@@ -344,7 +355,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 // ?? nodesCandidate.FirstOrDefault();
         // }
 
-        // return null;
+        return null;
 
         return nodesCandidate.FirstOrDefault();
     }
