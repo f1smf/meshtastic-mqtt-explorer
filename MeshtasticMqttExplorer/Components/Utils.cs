@@ -236,7 +236,7 @@ public static class Utils
     public static string GetPositionLinePopupHtml(Packet packet, string? details = null, Node? node = null)
     {
         return $"<p>" +
-               $"<b>{(node ?? packet.From)?.AllNames}</b>" +
+               $"<b><a href=\"/node/{(node ?? packet.From)?.Id}\">{(node ?? packet.From)?.AllNames}</a></b>" +
                $"</p>" +
                $"<p>" +
                $"<a href=\"/packet/{packet.Id}\" target=\"_blank\" rel=\"nofollow\">" +

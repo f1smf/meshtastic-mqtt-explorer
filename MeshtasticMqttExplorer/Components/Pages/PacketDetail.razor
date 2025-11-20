@@ -138,6 +138,14 @@
                         </details>
                     </div>
                 }
+                
+                @if (Packet.From is { Latitude: not null, Longitude: not null } && AllDuplicatedPackets.Any())
+                {
+                    <div style="padding: 20px">
+                        <Osm Latitude="Packet.From.Latitude!.Value" Longitude="Packet.From.Longitude!.Value" Zoom="8"
+                             @ref="Map"></Osm>
+                    </div>
+                }
             </div>
             
             @if (AllDuplicatedPackets.Any())
@@ -224,6 +232,9 @@
     private List<PacketsHop> AllDuplicatedPackets { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     
+    private bool HasRenderMapData { get; set; }
+    private Osm? Map { get; set; }
+    
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
@@ -231,6 +242,114 @@
         await FetchData();
 
         await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Map != null && !HasRenderMapData && Packet?.From is { Latitude: not null, Longitude: not null } && AllDuplicatedPackets.Any())
+        {
+            List<Osm.Marker> markers = [];
+            List<Osm.Line> lines = [];
+            
+            markers.Add(new Osm.Marker
+            {
+                Id = $"node-{Packet.FromId}",
+                Latitude = Packet.From.Latitude!.Value,
+                Longitude = Packet.From.Longitude!.Value,
+                Color = "gold",
+                Label = $"{Packet.From.FullName()}",
+                Popup = Utils.GetPositionLinePopupHtml(Packet, "Expéditeur")
+            });
+
+            foreach (var packetsHop in AllDuplicatedPackets)
+            {
+                // Pour tracer les chemins manquants (depuis les relayNode (Hop - 1). On cherche les packets en Hop - 2
+                var lastPacketHopForRelay = AllDuplicatedPackets.Find(p => p.Hop == packetsHop.Hop - 2);
+
+                foreach (var duplicatedPacket in packetsHop.Packets.Where(p => p.Gateway is { Latitude: not null, Longitude: not null }))
+                {
+                    markers.Add(new Osm.Marker
+                    {
+                        Id = $"node-{duplicatedPacket.GatewayId}",
+                        Latitude = duplicatedPacket.Gateway.Latitude!.Value,
+                        Longitude = duplicatedPacket.Gateway.Longitude!.Value,
+                        Color = "green",
+                        Label = $"{duplicatedPacket.Gateway.FullName()}",
+                        Popup = Utils.GetPositionLinePopupHtml(duplicatedPacket, $"Saut : {packetsHop.Hop}", duplicatedPacket.Gateway)
+                    });
+
+                    if (duplicatedPacket.FromId != duplicatedPacket.GatewayId)
+                    {
+                        if (duplicatedPacket.RelayNodeNode != null)
+                        {
+                            if (duplicatedPacket.RelayNodeNode is { Latitude: not null, Longitude: not null })
+                            {
+                                markers.Add(new Osm.Marker
+                                {
+                                    Id = $"node-{duplicatedPacket.RelayNodeId}",
+                                    Latitude = duplicatedPacket.RelayNodeNode.Latitude!.Value,
+                                    Longitude = duplicatedPacket.RelayNodeNode.Longitude!.Value,
+                                    Color = duplicatedPacket.RelayNodeNode.IsMqttGateway == false ? "blue" : "green",
+                                    Label = $"{duplicatedPacket.RelayNodeNode.FullName()}",
+                                    Popup = Utils.GetPositionLinePopupHtml(duplicatedPacket, $"Saut : {packetsHop.Hop - 1}<br />Noeud relais {(duplicatedPacket.RelayNodeNode.IsMqttGateway == false ? "non MQTT" : "")}", duplicatedPacket.RelayNodeNode)
+                                });
+
+                                lines.Add(new Osm.Line
+                                {
+                                    Id = $"line-{duplicatedPacket.RelayNodeId}-{duplicatedPacket.GatewayId}",
+                                    Points =
+                                    [
+                                        [duplicatedPacket.RelayNodeNode.Latitude.Value, duplicatedPacket.RelayNodeNode.Longitude.Value],
+                                        [duplicatedPacket.Gateway.Latitude.Value, duplicatedPacket.Gateway.Longitude.Value],
+                                    ],
+                                    Color = Utils.GreenLight,
+                                    Popup = $"Saut : {packetsHop.Hop}<br />Entre {duplicatedPacket.RelayNodeNode.OneName(true)} et {duplicatedPacket.Gateway.OneName(true)}"
+                                });
+                            }
+                        }
+                            else if (lastPacketHopForRelay != null)
+                            {
+                                // foreach (var packet in lastPacketHopForRelay.Packets.Where(p => p.Gateway is { Latitude: not null, Longitude: not null }))
+                                // {
+                                //     lines.Add(new Osm.Line
+                                //     {
+                                //         Id = $"line-{packet.RelayNodeId}-{duplicatedPacket.RelayNodeId}",
+                                //         Points =
+                                //         [
+                                //             [packet.Gateway!.Latitude!.Value, packet.Gateway!.Longitude!.Value],
+                                //             [duplicatedPacket.RelayNodeNode.Latitude.Value, duplicatedPacket.RelayNodeNode.Longitude.Value],
+                                //         ],
+                                //         Color = lastPacketHopForRelay?.Hop == packetsHop.Hop - 1 ? Utils.Gold : Utils.Red,
+                                //         Popup = $"Saut : {packetsHop.Hop - 1}<br />Probablement entre {packet.Gateway.OneName(true)} et {duplicatedPacket.RelayNodeNode.OneName(true)}"
+                                //     });
+                                // }
+                                // foreach (var packet in lastPacketHopForRelay.Packets.Where(p => p.RelayNodeNode is { Latitude: not null, Longitude: not null }))
+                                // {
+                                //     lines.Add(new Osm.Line
+                                //     {
+                                //         Id = $"line-{packet.RelayNodeId}-{duplicatedPacket.RelayNodeId}",
+                                //         Points =
+                                //         [
+                                //             [packet.RelayNodeNode!.Latitude!.Value, packet.RelayNodeNode!.Longitude!.Value],
+                                //             [duplicatedPacket.RelayNodeNode.Latitude.Value, duplicatedPacket.RelayNodeNode.Longitude.Value],
+                                //         ],
+                                //         Color = lastPacketHop?.Hop == packetsHop.Hop - 1 ? Utils.Gold : Utils.Red,
+                                //         Popup = $"Saut : {packetsHop.Hop - 1}<br />Probablement entre {packet.RelayNodeNode.OneName(true)} et {duplicatedPacket.RelayNodeNode.OneName(true)}"
+                                //     });
+                                // }
+                            }
+                    }
+                }
+            }
+
+            await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
+            await Task.Delay(TimeSpan.FromMilliseconds(150)); // Marker devant les lignes
+            await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
+
+            HasRenderMapData = true;
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     private async Task FetchData()
