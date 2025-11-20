@@ -168,6 +168,8 @@ window.addMarkerToMap = (marker) => {
             title: marker.label ?? '',
             alt: marker.label ?? '',
             icon: icon,
+            autoPanOnFocus: false,
+            autoPan: false,
         });
     } else {
         if (pin) {
@@ -191,6 +193,8 @@ window.addMarkerToMap = (marker) => {
                 color: marker.color ?? 'blue',
                 fillColor: marker.fillColor ?? marker.color ?? '*',
                 weight: 2,
+                autoPanOnFocus: false,
+                autoPan: false,
             });
         } else if (marker.iconType === 2) {
             let radiusMts = 10;
@@ -201,6 +205,8 @@ window.addMarkerToMap = (marker) => {
                 color: marker.color ?? 'blue',
                 fillColor: marker.fillColor ?? marker.color ?? '*',
                 weight: 2,
+                autoPanOnFocus: false,
+                autoPan: false,
             });
         }
     }
