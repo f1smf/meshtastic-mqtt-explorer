@@ -100,8 +100,15 @@
     {
         if (firstRender)
         {
-            await Init();
-            
+            try
+            {
+                await Init();
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Map init error");
+            }
+
             MapChangeInterop = new MapChangeEventInterop(JSRuntime);
             await MapChangeInterop.SetupMapChangeEventCallback(HandleMapChangeEvent);
         }
