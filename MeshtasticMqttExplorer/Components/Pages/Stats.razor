@@ -18,11 +18,11 @@
 <PageHeader Title="Statistiques">
     <SubtitleTemplate>Depuis le @MinDate.ToFrench()</SubtitleTemplate>
     <PageHeaderContent>
-        <Switch @bind-Checked="ShowOnlyRouterAccepted" Disabled="@Loading" CheckedChildren="Compter les trames autorisées uniquement" UnCheckedChildren="Compter les trames autorisées uniquement" OnChange="value => SetShowOnlyRouterAccepted(value)"/>
-        @if (ShowOnlyRouterAccepted)
-        {
-            @* <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> *@
-        }
+        @* <Switch @bind-Checked="ShowOnlyRouterAccepted" Disabled="@Loading" CheckedChildren="Compter les trames autorisées uniquement" UnCheckedChildren="Compter les trames autorisées uniquement" OnChange="value => SetShowOnlyRouterAccepted(value)"/> *@
+        @* @if (ShowOnlyRouterAccepted) *@
+        @* { *@
+        @*     $1$ <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> #1# *@
+        @* } *@
     </PageHeaderContent>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -44,8 +44,14 @@
         </GridCol>
 
         <GridCol Xs="24" Lg="4">
+            <Card Title="Taille moyenne paquets">
+                <Statistic Value="@AveragePacketSize" Suffix="Octets" Precision="1"/>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="4">
             <Card Title="Paquets aujourd'hui">
-                <Statistic Value="@NbPacketsSent"/>
+                <Statistic Value="@NbPacketsSent" />
             </Card>
         </GridCol>
         
@@ -214,8 +220,9 @@
     private DataContext Context { get; set; } = null!;
     private int NbNodes { get; set; }
     private int NbNodesLastHour { get; set; }
-    private int NbPacketsSent { get; set; }
+    private double NbPacketsSent { get; set; }
     private double NbPacketsSentMinutes { get; set; }
+    private double AveragePacketSize { get; set; }
     private float? AvgAirUtilTx { get; set; }
     private float? AvgChannelUtilization { get; set; }
     private List<ChartData<int>> DataProfileTypes { get; set; } = [];
@@ -373,6 +380,13 @@
             .OrderByDescending(v => v.value)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
+
+        AveragePacketSize = await Context.Packets
+            .Where(n => n.Payload != null)
+            .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.HopLimit > 0))
+            .AsNoTrackingWithIdentityResolution()
+            .AverageAsync(n => n.Payload!.Length);
 
         NbPacketsSent = await Context.Packets
             .Where(n => n.CreatedAt >= today)
